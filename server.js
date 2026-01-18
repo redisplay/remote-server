@@ -11,7 +11,6 @@ import { createWebcamRoutes } from './routes/webcams.js';
 import { createWeatherRoutes } from './routes/weather.js';
 import { createCalendarRoutes } from './routes/calendars.js';
 import { createGalleryRoutes } from './routes/gallery.js';
-import { initializeRedis } from './services/redis.js';
 import { ViewManager } from './services/viewManager.js';
 import { channelConfig } from './services/channelConfig.js';
 import { channelManager } from './services/channelManager.js';
@@ -43,7 +42,6 @@ app.use(morgan(':method :url - SSE DISCONNECTED :remote-addr - Duration: :respon
 }));
 
 // Initialize services
-await initializeRedis();
 await channelConfig.load();
 initializeWebcamDb(); // Initialize webcam database
 initializeWeatherDb(); // Initialize weather database

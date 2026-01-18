@@ -1,4 +1,3 @@
-import { subscribe, unsubscribe, publish } from './redis.js';
 import { logChannel } from '../utils/logger.js';
 import { rewriteImageUrls } from '../utils/imageProxy.js';
 
@@ -6,11 +5,9 @@ const channels = new Map(); // channel -> Set of SSE response objects
 const clientMap = new Map(); // res -> { clientId, channel, ip }
 const ipConnections = new Map(); // ip -> Set of { res, channel }
 
-const redisCallback = (channel) => (message) => {
+function broadcastToChannel(channel, message) {
   const clients = channels.get(channel);
   if (clients) {
-    //logChannel(`Broadcasting message to ${clients.size} client(s)`, channel, message);
-    
     // Rewrite image URLs in view messages
     let processedMessage = message;
     if (message.type === 'initial_view' || message.type === 'view_change') {
@@ -46,13 +43,9 @@ const redisCallback = (channel) => (message) => {
       }
     });
   }
-};
+}
 
 export class ChannelManager {
-  constructor() {
-    this.redisCallbacks = new Map(); // channel -> callback function
-  }
-
   async subscribeClient(channel, res, clientId, ip) {
     // Close any existing connections from the same IP
     if (ipConnections.has(ip)) {
@@ -83,11 +76,6 @@ export class ChannelManager {
     
     if (!channels.has(channel)) {
       channels.set(channel, new Set());
-      // Subscribe to Redis channel with a single callback
-      const callback = redisCallback(channel);
-      this.redisCallbacks.set(channel, callback);
-      await subscribe(channel, callback);
-      logChannel(`Subscribed to Redis channel`, channel);
     }
     
     channels.get(channel).add(res);
@@ -145,19 +133,13 @@ export class ChannelManager {
       
       if (clients.size === 0) {
         channels.delete(channel);
-        const callback = this.redisCallbacks.get(channel);
-        if (callback) {
-          await unsubscribe(channel, callback);
-          this.redisCallbacks.delete(channel);
-          logChannel(`Unsubscribed from Redis channel (no clients)`, channel);
-        }
       }
     }
   }
 
   async sendToChannel(channel, message) {
     logChannel(`Publishing message to channel`, channel, message);
-    await publish(channel, message);
+    broadcastToChannel(channel, message);
   }
 }
 

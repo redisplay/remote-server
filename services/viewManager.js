@@ -1,4 +1,4 @@
-import { publish } from './redis.js';
+import { channelManager } from './channelManager.js';
 import { logChannel, logInfo, logError, logWarn } from '../utils/logger.js';
 import { validateView, createView, parseRotateAt, isViewScheduled } from '../models/viewSchema.js';
 import { validateViewByType } from '../models/viewTypes.js';
@@ -531,7 +531,7 @@ export class ViewManager {
           view: view
         };
         //logChannel(`Broadcasting view change`, targetChannel, message);
-        await publish(targetChannel, message);
+        await channelManager.sendToChannel(targetChannel, message);
       } catch (err) {
         console.error('Error broadcasting view change:', err);
       }
@@ -819,7 +819,7 @@ export class ViewManager {
           type: 'view_change',
           view: updatedView
         };
-        await publish(channel, message);
+        await channelManager.sendToChannel(channel, message);
         logChannel(`Triggered gallery view ${viewId} for image ${image.id}`, channel);
         
         // Schedule rotation for this view
