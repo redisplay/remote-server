@@ -141,6 +141,96 @@ export class ChannelManager {
     logChannel(`Publishing message to channel`, channel, message);
     broadcastToChannel(channel, message);
   }
+
+  getConnectedClients(channel = null) {
+    const clients = [];
+    
+    const extractClientInfo = (clientInfo) => {
+      // Extract connection time from clientId (format: ip-timestamp)
+      // clientId is generated as `${req.ip}-${Date.now()}` in sse.js
+      const parts = clientInfo.clientId.split('-');
+      let timestamp = null;
+      
+      // Try to parse the last part as a timestamp (should be numeric)
+      if (parts.length > 0) {
+        const lastPart = parts[parts.length - 1];
+        const parsed = parseInt(lastPart);
+        if (!isNaN(parsed) && parsed > 0) {
+          timestamp = parsed;
+        }
+      }
+      
+      const connectedAt = timestamp ? new Date(timestamp) : null;
+      
+      return {
+        clientId: clientInfo.clientId,
+        channel: clientInfo.channel,
+        ip: clientInfo.ip,
+        connectedAt: connectedAt ? connectedAt.toISOString() : null,
+        connectedAtTimestamp: timestamp
+      };
+    };
+    
+    if (channel) {
+      // Get clients for a specific channel
+      const channelClients = channels.get(channel);
+      if (channelClients) {
+        channelClients.forEach((res) => {
+          const clientInfo = clientMap.get(res);
+          if (clientInfo) {
+            clients.push(extractClientInfo(clientInfo));
+          }
+        });
+      }
+    } else {
+      // Get all clients across all channels
+      clientMap.forEach((clientInfo, res) => {
+        clients.push(extractClientInfo(clientInfo));
+      });
+    }
+    
+    return clients;
+  }
+
+  getChannelStats() {
+    const stats = {};
+    
+    channels.forEach((channelClients, channel) => {
+      const clientList = [];
+      channelClients.forEach((res) => {
+        const clientInfo = clientMap.get(res);
+        if (clientInfo) {
+          // Extract connection time from clientId (format: ip-timestamp)
+          const parts = clientInfo.clientId.split('-');
+          let timestamp = null;
+          
+          if (parts.length > 0) {
+            const lastPart = parts[parts.length - 1];
+            const parsed = parseInt(lastPart);
+            if (!isNaN(parsed) && parsed > 0) {
+              timestamp = parsed;
+            }
+          }
+          
+          const connectedAt = timestamp ? new Date(timestamp) : null;
+          
+          clientList.push({
+            clientId: clientInfo.clientId,
+            ip: clientInfo.ip,
+            connectedAt: connectedAt ? connectedAt.toISOString() : null,
+            connectedAtTimestamp: timestamp
+          });
+        }
+      });
+      
+      stats[channel] = {
+        clientCount: channelClients.size,
+        clients: clientList
+      };
+    });
+    
+    return stats;
+  }
 }
 
 export const channelManager = new ChannelManager();

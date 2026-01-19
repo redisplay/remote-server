@@ -92,6 +92,29 @@ export function createChannelRoutes(viewManager) {
     }
   });
 
+  // Get all connected clients across all channels (must come before /:channel/clients)
+  router.get('/clients', (req, res) => {
+    const clients = channelManager.getConnectedClients();
+    const stats = channelManager.getChannelStats();
+    
+    res.json({
+      totalClients: clients.length,
+      clients,
+      channels: stats
+    });
+  });
+
+  // Get connected clients for a specific channel
+  router.get('/:channel/clients', (req, res) => {
+    const { channel } = req.params;
+    const clients = channelManager.getConnectedClients(channel);
+    res.json({
+      channel,
+      clientCount: clients.length,
+      clients
+    });
+  });
+
   return router;
 }
 
