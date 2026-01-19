@@ -18,6 +18,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      packages: read
 
     steps:
       - name: Checkout repository
@@ -64,24 +65,41 @@ jobs:
           sudo apt update && sudo apt install gh -y
 
       - name: Make package public
+        continue-on-error: true
         run: |
           PACKAGE_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
           OWNER=$(echo "${{ github.repository }}" | cut -d'/' -f1)
-          if [[ "$OWNER" == "${{ github.actor }}" ]]; then
-            gh api \
-              -X PATCH \
-              -H "Accept: application/vnd.github+json" \
-              -H "X-GitHub-Api-Version: 2022-11-28" \
-              /user/packages/container/$PACKAGE_NAME/visibility \
-              -f visibility=public
-          else
-            gh api \
-              -X PATCH \
-              -H "Accept: application/vnd.github+json" \
-              -H "X-GitHub-Api-Version: 2022-11-28" \
-              /orgs/$OWNER/packages/container/$PACKAGE_NAME/visibility \
-              -f visibility=public
-          fi
+          
+          # Wait a bit for package to be fully created
+          sleep 5
+          
+          # Retry logic
+          for i in {1..3}; do
+            if [[ "$OWNER" == "${{ github.actor }}" ]]; then
+              if gh api \
+                -X PATCH \
+                -H "Accept: application/vnd.github+json" \
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                /user/packages/container/$PACKAGE_NAME/visibility \
+                -f visibility=public 2>/dev/null; then
+                echo "Package made public successfully"
+                exit 0
+              fi
+            else
+              if gh api \
+                -X PATCH \
+                -H "Accept: application/vnd.github+json" \
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                /orgs/$OWNER/packages/container/$PACKAGE_NAME/visibility \
+                -f visibility=public 2>/dev/null; then
+                echo "Package made public successfully"
+                exit 0
+              fi
+            fi
+            echo "Attempt $i failed, retrying in 5 seconds..."
+            sleep 5
+          done
+          echo "Warning: Failed to make package public after 3 attempts"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
